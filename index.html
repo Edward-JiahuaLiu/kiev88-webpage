@@ -923,6 +923,7 @@ const VARIANTS = [
 
   loadGLB(VARIANTS[0].model).then(obj => {
     scene.remove(placeholder);
+    bakeTransforms(obj);
     centerAndScale(obj, 0.35);
     scene.add(obj);
     heroModel = obj;
@@ -1075,6 +1076,23 @@ function loadGLB(url) {
   });
 }
 
+function bakeTransforms(root) {
+  root.updateMatrixWorld(true);
+  root.traverse(node => {
+    if (!node.isMesh) return;
+    node.geometry = node.geometry.clone();
+    node.geometry.applyMatrix4(node.matrixWorld);
+    node.position.set(0, 0, 0);
+    node.quaternion.identity();
+    node.scale.set(1, 1, 1);
+    node.updateMatrix();
+  });
+  root.position.set(0, 0, 0);
+  root.quaternion.identity();
+  root.scale.set(1, 1, 1);
+  root.updateMatrixWorld(true);
+}
+
 function centerAndScale(obj, targetSize) {
   const box = new THREE.Box3().setFromObject(obj);
   const center = box.getCenter(new THREE.Vector3());
@@ -1103,6 +1121,7 @@ async function switchModel(variantId) {
       model = modelCache[variantId].clone();
     } else {
       model = await loadGLB(variant.model);
+      bakeTransforms(model);
       modelCache[variantId] = model;
       model = model.clone();
     }
