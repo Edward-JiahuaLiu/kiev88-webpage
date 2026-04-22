@@ -309,7 +309,8 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
-    min-height: 500px;
+    height: 500px;
+    align-self: start;
   }
 
   .viewer-container canvas {
@@ -719,7 +720,7 @@
       <div class="viewer-container" id="viewer-container">
         <div class="viewer-loading" id="viewer-loading">
           <div class="loading-spinner"></div>
-          <span class="loading-text">Loading model…</span>
+          <span class="loading-text">Please wait while the model is loading…</span>
         </div>
         <div class="viewer-controls-hint">Drag to rotate · Scroll to zoom · Right-drag to pan</div>
       </div>
