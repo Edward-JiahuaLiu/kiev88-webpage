@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reconstructing the Kiev 88 — A Photogrammetric Study</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<style>
+  /* ── Reset & Variables ── */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-deep: #1a1a1e;
+    --bg-surface: #222228;
+    --bg-card: #2a2a30;
+    --bg-card-hover: #32323a;
+    --accent: #c8a455;
+    --accent-dim: rgba(200, 164, 85, 0.15);
+    --accent-glow: rgba(200, 164, 85, 0.3);
+    --accent-warn: #c45c3e;
+    --accent-warn-dim: rgba(196, 92, 62, 0.15);
+    --text-primary: #e8e4dc;
+    --text-secondary: #8a8a8f;
+    --text-dim: #5a5a60;
+    --border: #3a3a40;
+    --font-display: 'DM Serif Display', serif;
+    --font-body: 'IBM Plex Sans', sans-serif;
+    --radius: 8px;
+    --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Grain overlay ── */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ── Hero Section ── */
+  .hero {
+    position: relative;
+    height: 100vh;
+    min-height: 600px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+  }
+
+  .hero-canvas-wrap {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .hero-canvas-wrap canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+  }
+
+  .hero-gradient {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: linear-gradient(to top, var(--bg-deep) 0%, transparent 100%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 2;
+    padding: 0 clamp(24px, 5vw, 80px) 60px;
+    max-width: 720px;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeUp 0.8s 0.3s forwards;
+  }
+
+  .hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 1.15;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeUp 0.8s 0.5s forwards;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+    font-weight: 300;
+    color: var(--text-secondary);
+    max-width: 520px;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeUp 0.8s 0.7s forwards;
+  }
+
+  .scroll-indicator {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    animation: fadeUp 0.8s 1.2s forwards;
+  }
+
+  .scroll-indicator span {
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .scroll-line {
+    width: 1px;
+    height: 32px;
+    background: var(--accent);
+    animation: pulse-line 2s infinite;
+  }
+
+  @keyframes pulse-line {
+    0%, 100% { opacity: 0.3; transform: scaleY(0.6); }
+    50% { opacity: 1; transform: scaleY(1); }
+  }
+
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Section Shared ── */
+  .section-pad {
+    padding: clamp(40px, 8vw, 100px) clamp(24px, 5vw, 80px);
+  }
+
+  .section-label {
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  .section-heading {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 3vw, 2.25rem);
+    line-height: 1.25;
+    margin-bottom: 12px;
+  }
+
+  .section-desc {
+    font-size: 0.95rem;
+    font-weight: 300;
+    color: var(--text-secondary);
+    max-width: 640px;
+    margin-bottom: 40px;
+  }
+
+  /* ── Intro Section ── */
+  .intro {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: start;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .intro-text p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    font-weight: 300;
+  }
+
+  .intro-text p strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .intro-specs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .spec-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+
+  .spec-card-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .spec-card-value {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .intro-image-wrap {
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    aspect-ratio: 4/3;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+  }
+
+  .intro-image-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .intro-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .intro-caption {
+    margin-top: 12px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  /* ── Explorer Section ── */
+  .explorer {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .explorer-layout {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 32px;
+    min-height: 600px;
+  }
+
+  /* 3D Viewer */
+  .viewer-container {
+    position: relative;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    min-height: 500px;
+  }
+
+  .viewer-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+  }
+
+  .viewer-controls-hint {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(26, 26, 30, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    transition: opacity var(--transition);
+  }
+
+  .viewer-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-surface);
+    z-index: 10;
+    transition: opacity 0.4s;
+  }
+
+  .viewer-loading.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 14px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  /* Control Panel */
+  .control-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .panel-section-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  .model-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .model-btn {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: var(--font-body);
+  }
+
+  .model-btn:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--text-dim);
+  }
+
+  .model-btn.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+
+  .model-btn.active.warn {
+    background: var(--accent-warn-dim);
+    border-color: var(--accent-warn);
+  }
+
+  .model-btn-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 3px;
+  }
+
+  .model-btn.active .model-btn-label { color: var(--accent); }
+  .model-btn.active.warn .model-btn-label { color: var(--accent-warn); }
+
+  .model-btn-desc {
+    font-size: 0.73rem;
+    color: var(--text-dim);
+    font-weight: 300;
+    line-height: 1.45;
+  }
+
+  .model-btn-indicator {
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity var(--transition);
+  }
+
+  .model-btn.active .model-btn-indicator { opacity: 1; }
+  .model-btn.active.warn .model-btn-indicator { background: var(--accent-warn); }
+
+  .model-btn-subset-tag {
+    display: inline-block;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .tag-subset {
+    background: rgba(200, 164, 85, 0.2);
+    color: var(--accent);
+  }
+
+  .tag-issue {
+    background: rgba(196, 92, 62, 0.2);
+    color: var(--accent-warn);
+  }
+
+  /* Input Images Grid */
+  .input-images-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .images-grid {
+    display: grid;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .images-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .images-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+  .image-thumb {
+    position: relative;
+    aspect-ratio: 4/3;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color var(--transition);
+  }
+
+  .image-thumb:hover { border-color: var(--accent); }
+
+  .image-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .image-thumb-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+  }
+
+  .image-thumb-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(26, 26, 30, 0.8);
+    padding: 2px 6px;
+    font-size: 0.58rem;
+    color: var(--text-secondary);
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
+
+  .images-group-label {
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    font-weight: 500;
+    margin-bottom: 6px;
+    margin-top: 8px;
+    letter-spacing: 0.04em;
+  }
+
+  .images-group-label:first-child { margin-top: 0; }
+
+  /* Annotation */
+  .variant-annotation {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 12px 14px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 300;
+    line-height: 1.55;
+    transition: border-color var(--transition);
+  }
+
+  .variant-annotation.warn {
+    border-left-color: var(--accent-warn);
+  }
+
+  .variant-annotation strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .variant-annotation .warn-text {
+    color: var(--accent-warn);
+    font-weight: 500;
+  }
+
+  /* ── Lightbox ── */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 10, 12, 0.92);
+    backdrop-filter: blur(12px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    cursor: pointer;
+  }
+
+  .lightbox.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .lightbox img {
+    max-width: 90vw;
+    max-height: 85vh;
+    object-fit: contain;
+    border-radius: var(--radius);
+  }
+
+  .lightbox-close {
+    position: absolute;
+    top: 24px;
+    right: 28px;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: var(--font-body);
+    transition: color var(--transition);
+  }
+
+  .lightbox-close:hover { color: var(--text-primary); }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 40px 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .footer p {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-weight: 300;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 1024px) {
+    .explorer-layout {
+      grid-template-columns: 1fr;
+    }
+    .control-panel {
+      order: -1;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .intro {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+    .intro-image-wrap { order: -1; }
+    .intro-specs { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ HERO ══════════════ -->
+<section class="hero" id="hero">
+  <div class="hero-canvas-wrap" id="hero-canvas-wrap"></div>
+  <div class="hero-gradient"></div>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Close-Range Photogrammetry</p>
+    <h1 class="hero-title">Reconstructing the Kiev&nbsp;88</h1>
+    <p class="hero-subtitle">An interactive exploration of how photographic capture strategy shapes three-dimensional digital reconstruction.</p>
+  </div>
+  <div class="scroll-indicator">
+    <span>Scroll to explore</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- ══════════════ INTRO ══════════════ -->
+<section class="section-pad" id="about">
+  <div class="intro">
+    <div class="intro-text">
+      <p class="section-label">About the Object</p>
+      <h2 class="section-heading">Kiev 88 Medium Format Camera</h2>
+      <p>The <strong>Kiev 88</strong> is a medium-format single-lens reflex camera produced by the Arsenal factory in Kyiv, Ukraine, from the early 1980s through to the early 2000s. It descends from the <strong>Salyut</strong>, which was itself derived from the <strong>Hasselblad 1600F</strong> — making the Kiev 88 part of a lineage that connects Soviet industrial manufacturing to one of the most iconic camera systems in photographic history.</p>
+      <p>Despite its Hasselblad-inspired origins, the Kiev 88 diverged significantly over time. It retained a focal-plane shutter in the body rather than adopting leaf shutters in the lenses, and featured its own modular system of interchangeable viewfinders, film backs, and lenses. It was the camera of choice for professional photographers across the Soviet Union, while Zenit and Zorki rangefinders served amateurs.</p>
+      <p>Today, the Kiev 88 occupies an interesting position in the second-hand market. Once available for very little, rising interest in analogue photography has pushed prices upward. Complete kits with body, standard 80mm lens, and film back typically sell for <strong>£100–£350</strong> depending on condition, with pristine or serviced examples (such as those rebuilt by ARAX) commanding higher prices. This makes it one of the most affordable entry points into 6×6 medium format — a fraction of the cost of an equivalent Hasselblad system.</p>
+      <p>Its combination of <strong>polished chrome trim, matte-painted metal, textured leatherette</strong>, and <strong>small-scale mechanical components</strong> makes it a challenging and instructive test case for photogrammetric capture. Each surface type responds differently to the reconstruction process. Note: the lens hood was left on during capture, so no glass optical elements are visible in the model.</p>
+
+      <div class="intro-specs">
+        <div class="spec-card">
+          <div class="spec-card-label">Format</div>
+          <div class="spec-card-value">6×6 cm (120 film)</div>
+        </div>
+        <div class="spec-card">
+          <div class="spec-card-label">Manufacturer</div>
+          <div class="spec-card-value">Arsenal, Kyiv</div>
+        </div>
+        <div class="spec-card">
+          <div class="spec-card-label">Production</div>
+          <div class="spec-card-value">c. 1980–2000s</div>
+        </div>
+        <div class="spec-card">
+          <div class="spec-card-label">Market Price</div>
+          <div class="spec-card-value">£100–£350</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="intro-image-wrap">
+        <img src="images/kiev88-photo.jpg" alt="Kiev 88 medium format camera">
+      </div>
+      <p class="intro-caption">The physical Kiev 88 used in this study, photographed prior to digitisation.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ EXPLORER ══════════════ -->
+<section class="section-pad" id="explorer" style="background: var(--bg-surface);">
+  <div class="explorer">
+    <p class="section-label">Interactive Comparison</p>
+    <h2 class="section-heading">Explore the Reconstructions</h2>
+    <p class="section-desc">The full dataset combines eye-level and elevated-angle images. Select a subset below to see how each partial image set performs on its own — and what happens when bottom-surface captures are introduced.</p>
+
+    <div class="explorer-layout">
+      <!-- 3D Viewer -->
+      <div class="viewer-container" id="viewer-container">
+        <div class="viewer-loading" id="viewer-loading">
+          <div class="loading-spinner"></div>
+          <span class="loading-text">Loading model…</span>
+        </div>
+        <div class="viewer-controls-hint">Drag to rotate · Scroll to zoom · Right-drag to pan</div>
+      </div>
+
+      <!-- Controls -->
+      <div class="control-panel">
+        <div>
+          <p class="panel-section-title">Capture Strategy</p>
+          <div class="model-buttons" id="model-buttons">
+            <!-- Buttons injected by JS -->
+          </div>
+        </div>
+
+        <div class="input-images-section" id="input-images-section">
+          <p class="panel-section-title">Source Photographs</p>
+          <div id="images-container">
+            <!-- Images injected by JS -->
+          </div>
+        </div>
+
+        <div class="variant-annotation" id="variant-annotation">
+          Select a capture strategy above to see details.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ FOOTER ══════════════ -->
+<footer class="footer">
+  <p>Reconstructing the Kiev 88 — A Photogrammetric Study · 2026</p>
+</footer>
+
+<!-- ══════════════ LIGHTBOX ══════════════ -->
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lightbox-close">&times;</button>
+  <img id="lightbox-img" src="" alt="Enlarged source photograph">
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ══════════════════════════════════════════════════════════════════════ -->
+<script>
+/* ──────────────────────────────────────────────
+   CONFIGURATION — UPDATE THESE PATHS
+   ──────────────────────────────────────────────
+   File structure expected:
+   
+   project-root/
+   ├── index.html
+   ├── models/
+   │   ├── kiev88-full.glb
+   │   ├── kiev88-eye.glb
+   │   ├── kiev88-elevated.glb
+   │   └── kiev88-inverted.glb
+   └── images/
+       ├── kiev88-photo.jpg
+       ├── eye/
+       │   ├── img1.jpg … img6.jpg
+       ├── elevated/
+       │   ├── img1.jpg … img6.jpg
+       └── inverted/
+           ├── img1.jpg … img6.jpg
+   ────────────────────────────────────────────── */
+
+const VARIANTS = [
+  {
+    id: 'full',
+    label: 'Full Dataset',
+    desc: 'Eye-level + elevated angles combined (12 images)',
+    warn: false,
+    note: 'The full dataset combines all eye-level and elevated-angle photographs into a single reconstruction. This produced the most complete geometry and the most consistent surface detail across the camera body. The two subsets below show what each angle range contributes individually.',
+    model: 'models/kiev88-full.glb',
+    // Full dataset shows BOTH image groups
+    imageGroups: [
+      {
+        label: 'Eye-level images',
+        images: [
+          'images/eye/img1.jpg',
+          'images/eye/img2.jpg',
+          'images/eye/img3.jpg',
+          'images/eye/img4.jpg',
+          'images/eye/img5.jpg',
+          'images/eye/img6.jpg',
+        ]
+      },
+      {
+        label: 'Elevated-angle images',
+        images: [
+          'images/elevated/img1.jpg',
+          'images/elevated/img2.jpg',
+          'images/elevated/img3.jpg',
+          'images/elevated/img4.jpg',
+          'images/elevated/img5.jpg',
+          'images/elevated/img6.jpg',
+        ]
+      }
+    ]
+  },
+  {
+    id: 'eye',
+    label: 'Eye-Level Only',
+    desc: 'Subset — horizontal-plane images only',
+    tag: 'subset',
+    warn: false,
+    note: 'This reconstruction uses <strong>only the 6 eye-level images</strong> from the full dataset. Horizontal coverage is adequate, but the top plate and viewfinder prism receive limited angular coverage, resulting in reduced detail on upper surfaces. Compare the top of the camera against the full dataset to see the difference.',
+    model: 'models/kiev88-eye.glb',
+    imageGroups: [
+      {
+        label: 'Eye-level images (used)',
+        images: [
+          'images/eye/img1.jpg',
+          'images/eye/img2.jpg',
+          'images/eye/img3.jpg',
+          'images/eye/img4.jpg',
+          'images/eye/img5.jpg',
+          'images/eye/img6.jpg',
+        ]
+      }
+    ]
+  },
+  {
+    id: 'elevated',
+    label: 'Elevated Angle Only',
+    desc: 'Subset — downward-looking images only',
+    tag: 'subset',
+    warn: false,
+    note: 'This reconstruction uses <strong>only the 6 elevated-angle images</strong> from the full dataset. The top plate and "KIEV 88" engraving are better captured from this vantage point, but the lower body and side detail are weaker. This demonstrates how angle selection directly shapes which surfaces are faithfully reconstructed.',
+    model: 'models/kiev88-elevated.glb',
+    imageGroups: [
+      {
+        label: 'Elevated-angle images (used)',
+        images: [
+          'images/elevated/img1.jpg',
+          'images/elevated/img2.jpg',
+          'images/elevated/img3.jpg',
+          'images/elevated/img4.jpg',
+          'images/elevated/img5.jpg',
+          'images/elevated/img6.jpg',
+        ]
+      }
+    ]
+  },
+  {
+    id: 'inverted',
+    label: 'Inverted Capture (Bottom)',
+    desc: 'Camera flipped upside-down to capture underside',
+    tag: 'issue',
+    warn: true,
+    note: '<strong>Intention:</strong> The camera\'s underside is inaccessible during normal capture, so the object was physically flipped upside-down and a full rotation was photographed from that inverted position. The goal was to capture as much bottom-surface geometry as possible. <br><br><span class="warn-text">Outcome:</span> Including these inverted images introduced significant interference into Polycam\'s reconstruction pipeline. The software struggled to reconcile the two orientations, resulting in geometric distortion, surface noise, and degraded overall model quality. This variant demonstrates how additional data can actively harm reconstruction when it conflicts with the software\'s alignment assumptions.',
+    model: 'models/kiev88-inverted.glb',
+    imageGroups: [
+      {
+        label: 'Inverted capture images',
+        images: [
+          'images/inverted/img1.jpg',
+          'images/inverted/img2.jpg',
+          'images/inverted/img3.jpg',
+          'images/inverted/img4.jpg',
+          'images/inverted/img5.jpg',
+          'images/inverted/img6.jpg',
+        ]
+      }
+    ]
+  }
+];
+
+/* ── Hero Auto-rotate Model ── */
+(function initHero() {
+  const wrap = document.getElementById('hero-canvas-wrap');
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, wrap.clientWidth / wrap.clientHeight, 0.1, 1000);
+  camera.position.set(0, 0.15, 0.55);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+  wrap.appendChild(renderer.domElement);
+
+  // Lighting
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+  const keyLight = new THREE.DirectionalLight(0xfff4e0, 1.0);
+  keyLight.position.set(2, 3, 2);
+  scene.add(keyLight);
+  const fillLight = new THREE.DirectionalLight(0xc8d8f0, 0.4);
+  fillLight.position.set(-2, 1, -1);
+  scene.add(fillLight);
+  const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+  rimLight.position.set(0, 0, -3);
+  scene.add(rimLight);
+
+  // Placeholder
+  const geo = new THREE.BoxGeometry(0.14, 0.12, 0.12);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.6, metalness: 0.4 });
+  const placeholder = new THREE.Mesh(geo, mat);
+  scene.add(placeholder);
+  let heroModel = placeholder;
+
+  loadGLB(VARIANTS[0].model).then(obj => {
+    scene.remove(placeholder);
+    centerAndScale(obj, 0.35);
+    scene.add(obj);
+    heroModel = obj;
+  }).catch(() => {});
+
+  function animate() {
+    requestAnimationFrame(animate);
+    heroModel.rotation.y += 0.003;
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = wrap.clientWidth / wrap.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  });
+})();
+
+
+/* ── Explorer Viewer ── */
+const viewerContainer = document.getElementById('viewer-container');
+const loadingEl = document.getElementById('viewer-loading');
+
+const expScene = new THREE.Scene();
+expScene.background = new THREE.Color(0x222228);
+
+const expCamera = new THREE.PerspectiveCamera(40, viewerContainer.clientWidth / viewerContainer.clientHeight, 0.01, 100);
+expCamera.position.set(0, 0.15, 0.6);
+
+const expRenderer = new THREE.WebGLRenderer({ antialias: true });
+expRenderer.setSize(viewerContainer.clientWidth, viewerContainer.clientHeight);
+expRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+expRenderer.outputEncoding = THREE.sRGBEncoding;
+expRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+expRenderer.toneMappingExposure = 1.2;
+viewerContainer.insertBefore(expRenderer.domElement, viewerContainer.firstChild);
+
+// Lighting
+expScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const expKey = new THREE.DirectionalLight(0xfff4e0, 1.0);
+expKey.position.set(2, 3, 2);
+expScene.add(expKey);
+const expFill = new THREE.DirectionalLight(0xc8d8f0, 0.4);
+expFill.position.set(-2, 1, -1);
+expScene.add(expFill);
+const expRim = new THREE.DirectionalLight(0xffffff, 0.3);
+expRim.position.set(0, -1, -3);
+expScene.add(expRim);
+
+// Orbit controls
+let isDragging = false;
+let isPanning = false;
+let prevMouse = { x: 0, y: 0 };
+let spherical = { theta: 0, phi: Math.PI / 2.3, radius: 0.6 };
+let panOffset = { x: 0, y: 0 };
+
+function updateCameraFromSpherical() {
+  expCamera.position.x = spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta) + panOffset.x;
+  expCamera.position.y = spherical.radius * Math.cos(spherical.phi) + panOffset.y;
+  expCamera.position.z = spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+  expCamera.lookAt(panOffset.x, panOffset.y, 0);
+}
+updateCameraFromSpherical();
+
+expRenderer.domElement.addEventListener('mousedown', e => {
+  if (e.button === 2 || e.ctrlKey) isPanning = true;
+  else isDragging = true;
+  prevMouse = { x: e.clientX, y: e.clientY };
+});
+
+window.addEventListener('mouseup', () => { isDragging = false; isPanning = false; });
+
+expRenderer.domElement.addEventListener('mousemove', e => {
+  if (!isDragging && !isPanning) return;
+  const dx = e.clientX - prevMouse.x;
+  const dy = e.clientY - prevMouse.y;
+  prevMouse = { x: e.clientX, y: e.clientY };
+  if (isPanning) {
+    panOffset.x -= dx * 0.0008;
+    panOffset.y += dy * 0.0008;
+  } else {
+    spherical.theta -= dx * 0.008;
+    spherical.phi = Math.max(0.3, Math.min(Math.PI - 0.3, spherical.phi - dy * 0.008));
+  }
+  updateCameraFromSpherical();
+});
+
+expRenderer.domElement.addEventListener('wheel', e => {
+  e.preventDefault();
+  spherical.radius = Math.max(0.15, Math.min(2.5, spherical.radius + e.deltaY * 0.0008));
+  updateCameraFromSpherical();
+}, { passive: false });
+
+expRenderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+// Touch
+let touchDist = null;
+expRenderer.domElement.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    isDragging = true;
+    prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  } else if (e.touches.length === 2) {
+    isDragging = false;
+    touchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  }
+}, { passive: false });
+
+expRenderer.domElement.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 1 && isDragging) {
+    const dx = e.touches[0].clientX - prevMouse.x;
+    const dy = e.touches[0].clientY - prevMouse.y;
+    prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    spherical.theta -= dx * 0.008;
+    spherical.phi = Math.max(0.3, Math.min(Math.PI - 0.3, spherical.phi - dy * 0.008));
+    updateCameraFromSpherical();
+  } else if (e.touches.length === 2) {
+    const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    if (touchDist) {
+      spherical.radius = Math.max(0.15, Math.min(2.5, spherical.radius - (dist - touchDist) * 0.003));
+      updateCameraFromSpherical();
+    }
+    touchDist = dist;
+  }
+}, { passive: false });
+
+expRenderer.domElement.addEventListener('touchend', () => { isDragging = false; touchDist = null; });
+
+let currentExpModel = null;
+
+function animateExplorer() {
+  requestAnimationFrame(animateExplorer);
+  expRenderer.render(expScene, expCamera);
+}
+animateExplorer();
+
+window.addEventListener('resize', () => {
+  expCamera.aspect = viewerContainer.clientWidth / viewerContainer.clientHeight;
+  expCamera.updateProjectionMatrix();
+  expRenderer.setSize(viewerContainer.clientWidth, viewerContainer.clientHeight);
+});
+
+
+/* ── GLB Loader ── */
+function loadGLB(url) {
+  return new Promise((resolve, reject) => {
+    if (!window.THREE.GLTFLoader) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/loaders/GLTFLoader.min.js';
+      script.onload = () => doLoad(url, resolve, reject);
+      script.onerror = () => reject(new Error('Could not load GLTFLoader'));
+      document.head.appendChild(script);
+    } else {
+      doLoad(url, resolve, reject);
+    }
+  });
+}
+
+function doLoad(url, resolve, reject) {
+  const loader = new THREE.GLTFLoader();
+  loader.load(url, gltf => resolve(gltf.scene), undefined, err => reject(err));
+}
+
+function centerAndScale(obj, targetSize) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const scale = targetSize / maxDim;
+  obj.scale.multiplyScalar(scale);
+  obj.position.sub(center.multiplyScalar(scale));
+}
+
+const modelCache = {};
+
+async function switchModel(variantId) {
+  const variant = VARIANTS.find(v => v.id === variantId);
+  if (!variant) return;
+  loadingEl.classList.remove('hidden');
+
+  if (currentExpModel) {
+    expScene.remove(currentExpModel);
+    currentExpModel = null;
+  }
+
+  try {
+    let model;
+    if (modelCache[variantId]) {
+      model = modelCache[variantId].clone();
+    } else {
+      model = await loadGLB(variant.model);
+      modelCache[variantId] = model;
+      model = model.clone();
+    }
+    centerAndScale(model, 0.35);
+    expScene.add(model);
+    currentExpModel = model;
+  } catch (err) {
+    console.warn('Model load failed for', variant.model, '— showing placeholder');
+    const geo = new THREE.BoxGeometry(0.14, 0.12, 0.12);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.7, metalness: 0.3 });
+    const mesh = new THREE.Mesh(geo, mat);
+    expScene.add(mesh);
+    currentExpModel = mesh;
+  }
+
+  loadingEl.classList.add('hidden');
+  spherical = { theta: 0, phi: Math.PI / 2.3, radius: 0.6 };
+  panOffset = { x: 0, y: 0 };
+  updateCameraFromSpherical();
+}
+
+
+/* ── Build UI ── */
+const buttonsContainer = document.getElementById('model-buttons');
+const imagesContainer = document.getElementById('images-container');
+const annotationEl = document.getElementById('variant-annotation');
+let activeVariant = null;
+
+function selectVariant(variantId) {
+  activeVariant = variantId;
+  const variant = VARIANTS.find(v => v.id === variantId);
+
+  // Update buttons
+  document.querySelectorAll('.model-btn').forEach(btn => {
+    const isActive = btn.dataset.id === variantId;
+    btn.classList.toggle('active', isActive);
+    const isWarn = VARIANTS.find(v => v.id === btn.dataset.id)?.warn;
+    if (isActive && isWarn) btn.classList.add('warn');
+    else btn.classList.remove('warn');
+  });
+
+  // Update images — build grouped layout
+  imagesContainer.innerHTML = '';
+
+  variant.imageGroups.forEach(group => {
+    const label = document.createElement('div');
+    label.className = 'images-group-label';
+    label.textContent = group.label;
+    imagesContainer.appendChild(label);
+
+    const grid = document.createElement('div');
+    // Use 4 columns for full dataset (12 images), 3 for subsets (6 images)
+    const totalImages = group.images.length;
+    grid.className = 'images-grid ' + (variant.id === 'full' ? 'cols-3' : 'cols-3');
+    
+    group.images.forEach((src, i) => {
+      const thumb = document.createElement('div');
+      thumb.className = 'image-thumb';
+      thumb.innerHTML = `<img src="${src}" alt="Source photo ${i + 1}" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'image-thumb-placeholder\\'>Image ${i + 1}</div>'">`;
+      thumb.addEventListener('click', () => openLightbox(src));
+      grid.appendChild(thumb);
+    });
+
+    imagesContainer.appendChild(grid);
+  });
+
+  // Update annotation
+  annotationEl.innerHTML = variant.note;
+  annotationEl.classList.toggle('warn', variant.warn);
+
+  // Load model
+  switchModel(variantId);
+}
+
+VARIANTS.forEach(v => {
+  const btn = document.createElement('button');
+  btn.className = 'model-btn';
+  btn.dataset.id = v.id;
+
+  let tagHTML = '';
+  if (v.tag === 'subset') {
+    tagHTML = '<span class="model-btn-subset-tag tag-subset">subset</span>';
+  } else if (v.tag === 'issue') {
+    tagHTML = '<span class="model-btn-subset-tag tag-issue">interference</span>';
+  }
+
+  btn.innerHTML = `
+    <span class="model-btn-label">${v.label}${tagHTML}</span>
+    <span class="model-btn-desc">${v.desc}</span>
+    <span class="model-btn-indicator"></span>
+  `;
+  btn.addEventListener('click', () => selectVariant(v.id));
+  buttonsContainer.appendChild(btn);
+});
+
+// Default selection
+selectVariant('full');
+
+
+/* ── Lightbox ── */
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightbox-img');
+
+function openLightbox(src) {
+  lightboxImg.src = src;
+  lightbox.classList.add('open');
+}
+
+lightbox.addEventListener('click', e => {
+  if (e.target === lightbox || e.target.id === 'lightbox-close') {
+    lightbox.classList.remove('open');
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') lightbox.classList.remove('open');
+});
+</script>
+
+</body>
+</html>
